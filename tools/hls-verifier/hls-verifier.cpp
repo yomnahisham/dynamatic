@@ -167,6 +167,12 @@ int main(int argc, char **argv) {
       cl::desc("Name of the handshake MLIR file with the kernel"),
       cl::value_desc("handshake-mlir"), cl::Required);
 
+  static cl::opt<bool> isSeparateHandshake(
+      "separate-handshake", cl::Optional,
+      cl::desc("If specified, every argument / result with channel or control "
+               "type will have a separate handshake."),
+      cl::init(false));
+
   cl::ParseCommandLineOptions(argc, argv, R"PREFIX(
     This is the hls-verifier tool for comparing C and VHDL/Verilog outputs.
 
@@ -202,7 +208,8 @@ int main(int argc, char **argv) {
   handshake::FuncOp funcOp =
       dyn_cast<handshake::FuncOp>(modOp->lookupSymbol(hlsKernelName));
 
-  VerificationContext ctx(simPathName, hlsKernelName, &funcOp);
+  VerificationContext ctx(simPathName, hlsKernelName, &funcOp,
+                          isSeparateHandshake);
 
   // Generate hls_verify_<hlsKernelName>.vhd
   vhdlTbCodegen(ctx);

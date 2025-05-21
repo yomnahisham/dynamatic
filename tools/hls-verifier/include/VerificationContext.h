@@ -32,8 +32,9 @@ static const std::string HLS_VERIFY_DIR = "HLS_VERIFY";
 struct VerificationContext {
   VerificationContext(const std::string &simPath,
                       const std::string &cFuvFunctionName,
-                      handshake::FuncOp *funcOp)
-      : simPath(simPath), funcOp(funcOp), kernelName(cFuvFunctionName) {}
+                      handshake::FuncOp *funcOp, bool isSeparateHandshake)
+      : simPath(simPath), funcOp(funcOp), kernelName(cFuvFunctionName),
+        isSeparateHandshake(isSeparateHandshake) {}
 
   static const char SEP = std::filesystem::path::preferred_separator;
 
@@ -45,6 +46,10 @@ struct VerificationContext {
 
   // The name of the top-level handshake function
   std::string kernelName;
+
+  // Should every function argument and result have a separate handshake
+  // interface?
+  bool isSeparateHandshake;
 
   std::string getVhdlTestbenchPath() const {
     return getHdlSrcDir() + SEP + "tb_" + kernelName + ".vhd";
