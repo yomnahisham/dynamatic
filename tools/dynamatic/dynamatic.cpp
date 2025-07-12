@@ -654,7 +654,7 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
   std::string rigidification = args.flags.contains(RIGIDIFICATION) ? "1" : "0";
   std::string disableLSQ = args.flags.contains(DISABLE_LSQ) ? "1" : "0";
-  
+
   std::string sizeLSQ = args.flags.contains(SIZE_LSQ) ? "1" : "0";
   if (sizeLSQ == "1" && disableLSQ == "1") {
     llvm::errs() << "Cannot use --size-lsq with --disable-lsq.";
@@ -664,7 +664,7 @@ CommandResult Compile::execute(CommandArguments &args) {
   state.polygeistPath = state.polygeistPath.empty()
                             ? state.dynamaticPath + getSeparator() + "polygeist"
                             : state.polygeistPath;
-  
+
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), state.polygeistPath, sharing,
