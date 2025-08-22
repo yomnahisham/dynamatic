@@ -18,10 +18,11 @@ USE_SHARING=$8
 FPUNITS_GEN=$9
 USE_RIGIDIFICATION=${10}
 DISABLE_LSQ=${11}
-SIZE_LSQ=${12}
+FAST_TOKEN_DELIVERY=${12}
+SIZE_LSQ=${13}
 
-POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
-CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
+POLYGEIST_CLANG_BIN="$POLYGEIST_PATH/build/bin/cgeist"
+CLANGXX_BIN="$POLYGEIST_PATH/llvm-project/build/bin/clang++"
 DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
 DYNAMATIC_PROFILER_BIN="$DYNAMATIC_DIR/bin/exp-frequency-profiler"
 DYNAMATIC_EXPORT_DOT_BIN="$DYNAMATIC_DIR/bin/export-dot"
@@ -153,9 +154,18 @@ else
 fi
 
 # cf level -> handshake level
-"$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" --lower-cf-to-handshake \
-  > "$F_HANDSHAKE"
-exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
+if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
+  echo_info "Running FTD algorithm for handshake conversion"
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
+    --ftd-lower-cf-to-handshake \
+    --handshake-combine-steering-logic \
+    > "$F_HANDSHAKE"
+  exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
+else
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" --lower-cf-to-handshake \
+    > "$F_HANDSHAKE"
+  exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
+fi
 
 # handshake transformations
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
@@ -165,7 +175,6 @@ exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
   > "$F_HANDSHAKE_TRANSFORMED"
 exit_on_fail "Failed to apply transformations to handshake" \
   "Applied transformations to handshake"
-
 
 # Credit-based sharing
 if [[ $USE_SHARING -ne 0 ]]; then
@@ -180,8 +189,9 @@ if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
   # Simple buffer placement
   echo_info "Running simple buffer placement (on-merges)."
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
+    --handshake-mark-fpu-impl="impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM timing-models=$DYNAMATIC_DIR/data/components-$FPUNITS_GEN.json" \
+    --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM timing-models=$DYNAMATIC_DIR/data/components.json" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
 else
@@ -203,8 +213,10 @@ else
   echo_info "Running smart buffer placement with CP = $TARGET_CP and algorithm = '$BUFFER_ALGORITHM'"
   cd "$COMP_DIR"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
+    --handshake-mark-fpu-impl="impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components-$FPUNITS_GEN.json target-period=$TARGET_CP timeout=300 dump-logs" \
+    --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs \
+    blif-files=$DYNAMATIC_DIR/data/aig/ lut-delay=0.55 lut-size=6 acyclic-type" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
   cd - > /dev/null

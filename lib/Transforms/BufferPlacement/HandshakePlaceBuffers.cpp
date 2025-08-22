@@ -25,6 +25,7 @@
 #include "dynamatic/Transforms/BufferPlacement/CostAwareBuffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
+#include "dynamatic/Transforms/BufferPlacement/MAPBUFBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Support/StdProfiler.h"
 #include "mlir/IR/OperationSupport.h"
@@ -44,7 +45,7 @@ static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 /// Algorithms that do require solving an MILP.
 static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22"),
-    CostAware("costaware");
+    CostAware("costaware"), MAPBUF("mapbuf");
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 namespace {
@@ -123,6 +124,7 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
   allAlgorithms[FPGA20] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[FPL22] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[CostAware] = &HandshakePlaceBuffersPass::placeUsingMILP;
+  allAlgorithms[MAPBUF] = &HandshakePlaceBuffersPass::placeUsingMILP;
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
   // Check that the algorithm exists
@@ -159,7 +161,7 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
   // parsing is not a performance bottleneck, so this should be acceptable.
   // TODO : this should go into a bespoke function
 
-  TimingDatabase timingDB(&getContext());
+  TimingDatabase timingDB;
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     llvm::errs() << "=== TimindDB read failed ===\n";
   modOp.walk([&](mlir::Operation *op) {
@@ -172,6 +174,9 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
         std::string delayStr = std::to_string(delay);
         std::replace(delayStr.begin(), delayStr.end(), '.', '_');
         internalDelayInterface.setInternalDelay(delayStr);
+      } else {
+        op->emitError("Failed to get internal delay from timing model");
+        return signalPassFailure();
       }
     }
   });
@@ -212,7 +217,7 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
   }
 
   // Read the operations' timing models from disk
-  TimingDatabase timingDB(&getContext());
+  TimingDatabase timingDB;
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     return failure();
 
@@ -517,6 +522,13 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
         logger, "placement", placement, env, info, timingDB, targetCP);
   }
 
+  if (algorithm == MAPBUF) {
+    // Create and solve the MILP
+    return checkLoggerAndSolve<mapbuf::MAPBUFBuffers>(
+        logger, "placement", placement, env, info, timingDB, targetCP,
+        blifFiles, lutDelay, lutSize, acyclicType);
+  }
+
   llvm_unreachable("unknown algorithm");
 }
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
@@ -527,7 +539,7 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
   // buffering constraints
 
   // Read the operations' timing models from disk
-  TimingDatabase timingDB(&getContext());
+  TimingDatabase timingDB;
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     return failure();
 
@@ -587,13 +599,12 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
     builder.setInsertionPoint(opDst);
 
     Value bufferIn = channel;
-    auto placeBuffer = [&](const TimingInfo &timing,
-                           const StringRef &bufferType, unsigned numSlots) {
+    auto placeBuffer = [&](BufferType bufferType, unsigned numSlots) {
       if (numSlots == 0)
         return;
 
       auto bufOp = builder.create<handshake::BufferOp>(
-          bufferIn.getLoc(), bufferIn, timing, numSlots, bufferType);
+          bufferIn.getLoc(), bufferIn, numSlots, bufferType);
       inheritBB(opDst, bufOp);
       nameAnalysis.setName(bufOp);
 
@@ -605,20 +616,17 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
     /// Prefered order of each buffer type on a channel:
     /// {SHIFT_REG_BREAK_DV, ONE_SLOT_BREAK_DVR, ONE_SLOT_BREAK_DV,
     /// FIFO_BREAK_DV, FIFO_BREAK_NONE, ONE_SLOT_BREAK_R}
-    placeBuffer(TimingInfo::break_dv(), BufferOp::SHIFT_REG_BREAK_DV,
-                placeRes.numShiftRegDV);
+    placeBuffer(BufferType::SHIFT_REG_BREAK_DV, placeRes.numShiftRegDV);
     for (unsigned int i = 0; i < placeRes.numOneSlotDVR; i++) {
-      placeBuffer(TimingInfo::break_dvr(), BufferOp::ONE_SLOT_BREAK_DVR, 1);
+      placeBuffer(BufferType::ONE_SLOT_BREAK_DVR, 1);
     }
     for (unsigned int i = 0; i < placeRes.numOneSlotDV; i++) {
-      placeBuffer(TimingInfo::break_dv(), BufferOp::ONE_SLOT_BREAK_DV, 1);
+      placeBuffer(BufferType::ONE_SLOT_BREAK_DV, 1);
     }
-    placeBuffer(TimingInfo::break_dv(), BufferOp::FIFO_BREAK_DV,
-                placeRes.numFifoDV);
-    placeBuffer(TimingInfo::break_none(), BufferOp::FIFO_BREAK_NONE,
-                placeRes.numFifoNone);
+    placeBuffer(BufferType::FIFO_BREAK_DV, placeRes.numFifoDV);
+    placeBuffer(BufferType::FIFO_BREAK_NONE, placeRes.numFifoNone);
     for (unsigned int i = 0; i < placeRes.numOneSlotR; i++) {
-      placeBuffer(TimingInfo::break_r(), BufferOp::ONE_SLOT_BREAK_R, 1);
+      placeBuffer(BufferType::ONE_SLOT_BREAK_R, 1);
     }
   }
 }
