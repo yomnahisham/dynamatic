@@ -1,0 +1,172 @@
+[
+  {
+    "name": "handshake.addi",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/addi.v",
+    "dependencies": ["join_type"],
+    "hdl": "verilog",
+    "synthesis": {
+      "tool": "yosys",
+      "pdk": "sky130",
+      "library": "sky130_fd_sc_hd",
+      "liberty": "sky130_fd_sc_hd__tt_025C_1v80.lib"
+    }
+  },
+  {
+    "name": "handshake.addf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/addf.v",
+    "dependencies": ["join_type", "delay_buffer", "oehb"],
+    "hdl": "verilog",
+    "synthesis": {
+      "tool": "yosys",
+      "pdk": "sky130",
+      "library": "sky130_fd_sc_hd",
+      "liberty": "sky130_fd_sc_hd__tt_025C_1v80.lib"
+    }
+  },
+  {
+    "name": "handshake.muli",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/muli.v",
+    "dependencies": ["join_type", "delay_buffer", "oehb_dataless"],
+    "hdl": "verilog",
+    "synthesis": {
+      "tool": "yosys",
+      "pdk": "sky130",
+      "library": "sky130_fd_sc_hd",
+      "liberty": "sky130_fd_sc_hd__tt_025C_1v80.lib"
+    }
+  },
+  {
+    "name": "handshake.merge",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/merge.v",
+    "hdl": "verilog",
+    "synthesis": {
+      "tool": "yosys",
+      "pdk": "sky130",
+      "library": "sky130_fd_sc_hd",
+      "liberty": "sky130_fd_sc_hd__tt_025C_1v80.lib"
+    }
+  },
+  {
+    "name": "handshake.fork",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/fork.v",
+    "module-name": "fork_type",
+    "dependencies": ["fork_dataless"],
+    "hdl": "verilog",
+    "synthesis": {
+      "tool": "yosys",
+      "pdk": "sky130",
+      "library": "sky130_fd_sc_hd",
+      "liberty": "sky130_fd_sc_hd__tt_025C_1v80.lib"
+    }
+  },
+  {
+    "name": "handshake.buffer",
+    "parameters": [
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "ONE_SLOT_BREAK_DV", "generic": false },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/oehb.v",
+    "module-name": "oehb",
+    "dependencies": ["oehb_dataless"],
+    "hdl": "verilog",
+    "synthesis": {
+      "tool": "yosys",
+      "pdk": "sky130",
+      "library": "sky130_fd_sc_hd",
+      "liberty": "sky130_fd_sc_hd__tt_025C_1v80.lib"
+    }
+  },
+  {
+    "name": "handshake.constant",
+    "parameters": [
+      { "name": "VALUE", "type": "string" },
+      { "name": "DATA_WIDTH", "type": "unsigned", "generic": true }
+    ],
+    "generator": "\"$DYNAMATIC/bin/generators/rtl-constant-generator-verilog\" \"$DYNAMATIC/data/verilog/handshake/constant.v\" \"$OUTPUT_DIR/$MODULE_NAME.v\" $MODULE_NAME $VALUE",
+    "hdl": "verilog",
+    "synthesis": {
+      "tool": "yosys",
+      "pdk": "sky130",
+      "library": "sky130_fd_sc_hd",
+      "liberty": "sky130_fd_sc_hd__tt_025C_1v80.lib"
+    }
+  },
+  {
+    "name": "handshake.source",
+    "parameters": [],
+    "generic": "$DYNAMATIC/data/verilog/handshake/source.v",
+    "hdl": "verilog",
+    "synthesis": {
+      "tool": "yosys",
+      "pdk": "sky130",
+      "library": "sky130_fd_sc_hd",
+      "liberty": "sky130_fd_sc_hd__tt_025C_1v80.lib"
+    }
+  },
+  {
+    "name": "handshake.sink",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/sink.v",
+    "hdl": "verilog",
+    "synthesis": {
+      "tool": "yosys",
+      "pdk": "sky130",
+      "library": "sky130_fd_sc_hd",
+      "liberty": "sky130_fd_sc_hd__tt_025C_1v80.lib"
+    }
+  },
+  {
+    "name": "handshake.join",
+    "parameters": [{ "name": "SIZE", "type": "unsigned", "lb": 1 }],
+    "generic": "$DYNAMATIC/data/verilog/handshake/join.v",
+    "module-name": "join_type",
+    "dependencies": ["logic"],
+    "hdl": "verilog",
+    "synthesis": {
+      "tool": "yosys",
+      "pdk": "sky130",
+      "library": "sky130_fd_sc_hd",
+      "liberty": "sky130_fd_sc_hd__tt_025C_1v80.lib"
+    }
+  },
+  {
+    "generic": "$DYNAMATIC/data/verilog/support/logic.v",
+    "hdl": "verilog",
+    "synthesis": {
+      "tool": "yosys",
+      "pdk": "sky130",
+      "library": "sky130_fd_sc_hd",
+      "liberty": "sky130_fd_sc_hd__tt_025C_1v80.lib"
+    }
+  },
+  {
+    "generic": "$DYNAMATIC/data/verilog/support/delay_buffer.v",
+    "hdl": "verilog",
+    "synthesis": {
+      "tool": "yosys",
+      "pdk": "sky130",
+      "library": "sky130_fd_sc_hd",
+      "liberty": "sky130_fd_sc_hd__tt_025C_1v80.lib"
+    }
+  }
+]
